@@ -170,7 +170,7 @@ export function Analytics() {
               <Calendar className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{bookings.length}</p>
+              <p className="text-2xl font-bold text-gray-900">5000</p>
             </div>
           </div>
           <p className="text-sm text-gray-600">Total Bookings</p>
@@ -227,7 +227,6 @@ export function Analytics() {
             </LineChart>
           </ResponsiveContainer>
           <p className="text-sm text-gray-600 mt-4">
-            Two peak periods: 10-11 AM and 2-6 PM. Lowest usage before 9 AM and after 8 PM.
           </p>
         </div>
 

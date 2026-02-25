@@ -23,61 +23,50 @@ export function Analytics() {
   }
 
   // Calculate metrics from real data
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-  const recentBookings = bookings.filter(b => b.startTime >= sevenDaysAgo);
-
-  // 1. Avg Weekly Utilization (based on historical data vs capacity)
-  // Calculate total utilized person-hours in the last 7 days
-  const totalUtilizedHours = recentBookings.reduce((sum, b) => {
-    const duration = (b.endTime.getTime() - b.startTime.getTime()) / (1000 * 60 * 60);
-    
-    const resource = resources.find(r => r.id === b.resourceId);
-    // Normalize type to handle Study_room vs study-room
-    const type = resource?.type?.toLowerCase().replace(/_/g, '-').trim() || '';
-    const isExclusive = ['study-room', 'meeting-room', 'equipment', 'study room', 'meeting room', 'conference-room', 'conference room'].includes(type);
-
-    // For exclusive resources, a booking utilizes the full capacity
-    if (resource && isExclusive) {
-      return sum + (duration * resource.capacity);
-    }
-    
-    return sum + duration;
+  // 1. Avg Weekly Utilization (Capacity Utilization: Occupied / Max Capacity)
+  const totalUtilizationSum = historicalData.reduce((sum, d) => {
+    const r = resources.find(res => res.id === d.resourceId);
+    const capacity = r?.capacity || 0;
+    return sum + (capacity > 0 ? (d.occupancy / capacity) * 100 : 0);
   }, 0);
 
-  // Estimate total capacity hours (Total Capacity * 14 operating hours * 7 days)
-  const totalCapacity = resources.reduce((sum, r) => sum + r.capacity, 0);
-  const totalAvailableHours = totalCapacity * 14 * 7; // Assuming 14 hour days (8am-10pm)
-
-  const avgWeeklyUtilization = totalAvailableHours > 0 
-    ? ((totalUtilizedHours / totalAvailableHours) * 100).toFixed(1)
+  const avgWeeklyUtilization = historicalData.length > 0 
+    ? (totalUtilizationSum / historicalData.length).toFixed(1)
     : '0';
 
   // 2. Avg Session Duration
-  const totalDurationHours = recentBookings.reduce((sum, b) => {
-    const start = b.startTime.getTime();
-    const end = b.endTime.getTime();
+  // Use all confirmed bookings for better statistical significance
+  const confirmedBookings = bookings.filter(b => b.status === 'confirmed');
+  
+  const totalDurationHours = confirmedBookings.reduce((sum, b) => {
+    const start = new Date(b.startTime).getTime();
+    const end = new Date(b.endTime).getTime();
     return sum + (end - start) / (1000 * 60 * 60);
   }, 0);
   
-  const avgSessionDuration = recentBookings.length > 0 
-    ? (totalDurationHours / recentBookings.length).toFixed(1) 
+  const avgSessionDuration = confirmedBookings.length > 0 
+    ? (totalDurationHours / confirmedBookings.length).toFixed(1) 
     : '0';
 
   // 3. Active Students (unique users in recent bookings)
-  const activeStudents = new Set(recentBookings.map(b => b.userId)).size;
+  const activeStudents = new Set(bookings.map(b => b.userId)).size;
 
   // Calculate average occupancy by day of week
   const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const weeklyData = daysOfWeek.map(day => {
     const dayData = historicalData.filter(d => d.date === day);
-    const avgOccupancy = dayData.length > 0 
-      ? dayData.reduce((sum, d) => sum + d.occupancy, 0) / dayData.length 
-      : 0;
+    
+    const totalOccupancy = dayData.reduce((sum, d) => sum + d.occupancy, 0);
+    const totalCapacity = dayData.reduce((sum, d) => {
+      const r = resources.find(res => res.id === d.resourceId);
+      return sum + (r?.capacity || 0);
+    }, 0);
+
+    const utilization = totalCapacity > 0 ? (totalOccupancy / totalCapacity) * 100 : 0;
+
     return {
       day,
-      occupancy: Math.round(avgOccupancy),
+      utilization: Math.round(utilization),
     };
   });
 
@@ -85,48 +74,52 @@ export function Analytics() {
   const hourlyData = Array.from({ length: 14 }, (_, i) => {
     const hour = i + 8; // 8 AM to 10 PM
     const hourData = historicalData.filter(d => d.hour === hour);
-    const avgOccupancy = hourData.length > 0
-      ? hourData.reduce((sum, d) => sum + d.occupancy, 0) / hourData.length
-      : 0;
+    
+    const totalOccupancy = hourData.reduce((sum, d) => sum + d.occupancy, 0);
+    const totalCapacity = hourData.reduce((sum, d) => {
+      const r = resources.find(res => res.id === d.resourceId);
+      return sum + (r?.capacity || 0);
+    }, 0);
+
+    const utilization = totalCapacity > 0 ? (totalOccupancy / totalCapacity) * 100 : 0;
+
     return {
       hour: hour > 12 ? `${hour - 12} PM` : `${hour} AM`,
-      occupancy: Math.round(avgOccupancy),
+      utilization: Math.round(utilization),
     };
   });
 
   // Resource type distribution
-  const typeDistribution: Record<string, number> = {
-    'study_room': 0,
-    'conference_room': 0,
-    'computer_lab': 0
-  };
+  const typeDistribution = resources.reduce((acc, resource) => {
+    // Normalize type name for consistent grouping and better display
+    const formattedType = resource.type
+      .replace(/[-_]/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase());
+      
+    acc[formattedType] = (acc[formattedType] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
 
-  resources.forEach(r => {
-    if (Object.prototype.hasOwnProperty.call(typeDistribution, r.type)) {
-      typeDistribution[r.type] = (typeDistribution[r.type] || 0) + 1;
-    }
-  });
-
-  const pieData = Object.entries(typeDistribution).map(([type, count]) => ({
-    name: type.replace(/_/g, ' '),
-    value: count
+  const pieData = Object.entries(typeDistribution).map(([name, value]) => ({
+    name,
+    value
   }));
 
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#8B5CF6'];
 
   // Most utilized resources
-  const resourceHours: Record<string, number> = {};
-  
-  recentBookings.forEach(b => {
-    const duration = (b.endTime.getTime() - b.startTime.getTime()) / (1000 * 60 * 60);
-    resourceHours[b.resourceId] = (resourceHours[b.resourceId] || 0) + duration;
-  });
-
   const utilizationData = resources
     .map(r => {
-      const hours = resourceHours[r.id] || 0;
-      // Calculate percentage based on 14-hour days over 7 days (98 hours total capacity)
-      const utilization = Math.round((hours / (14 * 7)) * 100);
+      // Calculate utilization based on capacity (Occupied / Max Capacity)
+      const resourceHistory = historicalData.filter(d => d.resourceId === r.id);
+      
+      if (resourceHistory.length === 0) return { name: r.name, utilization: 0 };
+
+      const sumUtilization = resourceHistory.reduce((sum, d) => {
+        return sum + (d.occupancy / r.capacity) * 100;
+      }, 0);
+      const utilization = Math.round(sumUtilization / resourceHistory.length);
+
       return {
         name: r.name,
         utilization: Math.min(100, utilization)
@@ -156,7 +149,7 @@ export function Analytics() {
               <p className="text-2xl font-bold text-gray-900">{avgWeeklyUtilization}%</p>
             </div>
           </div>
-          <p className="text-sm text-gray-600">Avg. Weekly Utilization</p>
+          <p className="text-sm text-gray-600">Avg. Capacity Utilization</p>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -177,10 +170,10 @@ export function Analytics() {
               <Calendar className="w-5 h-5 text-purple-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-gray-900">{recentBookings.length}</p>
+              <p className="text-2xl font-bold text-gray-900">{bookings.length}</p>
             </div>
           </div>
-          <p className="text-sm text-gray-600">Bookings This Week</p>
+          <p className="text-sm text-gray-600">Total Bookings</p>
         </div>
 
         <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -200,16 +193,17 @@ export function Analytics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Weekly Patterns */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Usage Patterns</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Utilization Patterns</h3>
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={weeklyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
               <XAxis dataKey="day" stroke="#6B7280" />
-              <YAxis stroke="#6B7280" />
+              <YAxis stroke="#6B7280" domain={[0, 100]} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }}
+                formatter={(value: number) => [`${value}%`, 'Utilization']}
               />
-              <Bar dataKey="occupancy" fill="#3B82F6" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="utilization" fill="#3B82F6" radius={[8, 8, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
           <p className="text-sm text-gray-600 mt-4">
@@ -219,16 +213,17 @@ export function Analytics() {
 
         {/* Hourly Patterns */}
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Usage Patterns</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Utilization Patterns</h3>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={hourlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
               <XAxis dataKey="hour" stroke="#6B7280" />
-              <YAxis stroke="#6B7280" />
+              <YAxis stroke="#6B7280" domain={[0, 100]} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }}
+                formatter={(value: number) => [`${value}%`, 'Utilization']}
               />
-              <Line type="monotone" dataKey="occupancy" stroke="#10B981" strokeWidth={2} />
+              <Line type="monotone" dataKey="utilization" stroke="#10B981" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
           <p className="text-sm text-gray-600 mt-4">
@@ -269,7 +264,7 @@ export function Analytics() {
           <ResponsiveContainer width="100%" height={300}>
             <BarChart data={utilizationData} layout="vertical">
               <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis type="number" stroke="#6B7280" />
+              <XAxis type="number" stroke="#6B7280" domain={[0, 100]} />
               <YAxis dataKey="name" type="category" stroke="#6B7280" width={120} />
               <Tooltip 
                 contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }}
@@ -278,7 +273,7 @@ export function Analytics() {
             </BarChart>
           </ResponsiveContainer>
           <p className="text-sm text-gray-600 mt-4">
-            Current utilization rates for the most popular resources on campus.
+            Average capacity utilization (occupied / max capacity) for the past 7 days.
           </p>
         </div>
       </div>

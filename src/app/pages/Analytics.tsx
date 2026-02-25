@@ -283,7 +283,7 @@ export function Analytics() {
         </div>
       </div>
 
-      {/* Insights Panel */}
+      {/* Insights Panel 
       <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-200 p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Key Insights & Recommendations</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -312,7 +312,9 @@ export function Analytics() {
             </p>
           </div>
         </div>
+        
       </div>
+       */}
     </div>
   );
 }

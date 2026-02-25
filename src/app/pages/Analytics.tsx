@@ -207,7 +207,7 @@ export function Analytics() {
             </BarChart>
           </ResponsiveContainer>
           <p className="text-sm text-gray-600 mt-4">
-            Peak usage occurs mid-week (Tuesday-Thursday).
+            Peak usage occurs mid-week (Monday-Thursday).
           </p>
         </div>
 

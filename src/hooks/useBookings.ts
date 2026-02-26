@@ -77,7 +77,8 @@ export function useBookings(userId?: string, resourceId?: string) {
     resourceId: string,
     userId: string,
     startTime: Date,
-    endTime: Date
+    endTime: Date,
+    attendees: number = 1
   ): Promise<{ success: boolean; error?: string }> {
     try {
       // Check resource availability
@@ -102,37 +103,30 @@ export function useBookings(userId?: string, resourceId?: string) {
 
       if (overlapError) throw overlapError;
 
-      // Check if USER has overlapping bookings on ANY resource
+      // MODIFIED: Check if USER has overlapping bookings on ANY OTHER resource
       const { count: userOverlaps, error: userOverlapError } = await supabase
         .from('bookings')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
         .eq('status', 'confirmed')
+        .neq('resource_id', resourceId) // Allow multiple bookings for the same resource
         .lt('start_time', endTime.toISOString())
         .gt('end_time', startTime.toISOString());
 
       if (userOverlapError) throw userOverlapError;
 
       if ((userOverlaps || 0) > 0) {
-        return { success: false, error: 'You already have a booking during this time slot.' };
+        return { success: false, error: 'You already have a booking for a different resource during this time slot.' };
       }
 
-      // ✅ IMPORTANT FIX: underscore types
-      const type = String(resourceData.type || '').trim().toLowerCase();
-      const isExclusive = ['study_room', 'conference_room', 'meeting_room', 'equipment'].includes(type);
-
-      const maxBookings = isExclusive ? 1 : resourceData.capacity;
-
-      if ((existingBookings || 0) >= maxBookings) {
+      // Check if the new booking exceeds the total capacity
+      if ((existingBookings || 0) + attendees > resourceData.capacity) {
         return {
           success: false,
-          error: isExclusive
-            ? 'This resource is already booked for the selected time slot.'
-            : `This resource is fully booked (Capacity: ${resourceData.capacity}) for the selected time slot.`
+          error: `Booking for ${attendees} person(s) would exceed resource capacity of ${resourceData.capacity}.`
         };
       }
 
-      // Generate a new booking ID (B-XXXX format)
       const { data: lastBooking } = await supabase
         .from('bookings')
         .select('id')
@@ -140,24 +134,28 @@ export function useBookings(userId?: string, resourceId?: string) {
         .limit(1)
         .maybeSingle();
 
-      let newId = 'B-0001';
+      let lastNum = 0;
       if (lastBooking?.id) {
-        const lastNum = parseInt(String(lastBooking.id).split('-')[1], 10);
-        if (!Number.isNaN(lastNum)) {
-          newId = `B-${String(lastNum + 1).padStart(4, '0')}`;
+        const parsedNum = parseInt(String(lastBooking.id).split('-')[1], 10);
+        if (!Number.isNaN(parsedNum)) {
+          lastNum = parsedNum;
         }
       }
 
-      const { error: insertError } = await supabase.from('bookings').insert([
-        {
+      // Create an array of new booking objects, one for each attendee
+      const newBookings = Array.from({ length: attendees }, (_, i) => {
+        const newId = `B-${String(lastNum + 1 + i).padStart(4, '0')}`;
+        return {
           id: newId,
           resource_id: resourceId,
           user_id: userId,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           status: 'confirmed'
-        }
-      ]);
+        };
+      });
+
+      const { error: insertError } = await supabase.from('bookings').insert(newBookings);
 
       if (insertError) throw insertError;
 

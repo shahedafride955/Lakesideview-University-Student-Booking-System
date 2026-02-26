@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase, DbBooking } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase';
 
 export interface Booking {
   id: string;
@@ -19,29 +19,36 @@ export function useBookings(userId?: string, resourceId?: string) {
 
   useEffect(() => {
     fetchBookings();
+
+    const channel = supabase
+      .channel(`bookings-${userId || 'all'}-${resourceId || 'all'}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () => fetchBookings())
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel).catch(() => {});
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, resourceId]);
 
   async function fetchBookings() {
     try {
       setLoading(true);
-      
+
       let query = supabase
         .from('bookings')
-        .select(`
+        .select(
+          `
           *,
           resources(name),
           users(name)
-        `);
+        `
+        );
 
-      if (userId) {
-        query = query.eq('user_id', userId);
-      }
-      if (resourceId) {
-        query = query.eq('resource_id', resourceId);
-      }
+      if (userId) query = query.eq('user_id', userId);
+      if (resourceId) query = query.eq('resource_id', resourceId);
 
       const { data, error: bookingsError } = await query;
-
       if (bookingsError) throw bookingsError;
 
       const mappedBookings: Booking[] = (data || []).map((booking: any) => ({
@@ -52,7 +59,8 @@ export function useBookings(userId?: string, resourceId?: string) {
         userName: booking.users?.name || 'Unknown User',
         startTime: new Date(booking.start_time),
         endTime: new Date(booking.end_time),
-        status: booking.status as 'confirmed' | 'pending' | 'cancelled'
+        // ✅ IMPORTANT FIX: normalize status so "Confirmed"/"CONFIRMED"/" confirmed " works
+        status: String(booking.status || '').trim().toLowerCase() as 'confirmed' | 'pending' | 'cancelled'
       }));
 
       setBookings(mappedBookings);
@@ -83,19 +91,18 @@ export function useBookings(userId?: string, resourceId?: string) {
         return { success: false, error: 'Resource not found' };
       }
 
-      // Check for overlapping bookings
+      // Check for overlapping bookings on same resource
       const { count: existingBookings, error: overlapError } = await supabase
         .from('bookings')
         .select('*', { count: 'exact', head: true })
         .eq('resource_id', resourceId)
         .eq('status', 'confirmed')
-        // Overlap logic: (StartA < EndB) and (EndA > StartB)
         .lt('start_time', endTime.toISOString())
         .gt('end_time', startTime.toISOString());
 
       if (overlapError) throw overlapError;
 
-      // Check if USER has any overlapping bookings on ANY resource
+      // Check if USER has overlapping bookings on ANY resource
       const { count: userOverlaps, error: userOverlapError } = await supabase
         .from('bookings')
         .select('*', { count: 'exact', head: true })
@@ -110,10 +117,10 @@ export function useBookings(userId?: string, resourceId?: string) {
         return { success: false, error: 'You already have a booking during this time slot.' };
       }
 
-      // Determine max allowed bookings based on resource type
-      // Exclusive resources (rooms) allow 1 booking per slot regardless of capacity (capacity is for people count)
-      // Shared resources (labs) allow bookings up to capacity
-      const isExclusive = ['study-room', 'meeting-room', 'equipment', 'conference-room', 'conference room'].includes(resourceData.type);
+      // ✅ IMPORTANT FIX: underscore types
+      const type = String(resourceData.type || '').trim().toLowerCase();
+      const isExclusive = ['study_room', 'conference_room', 'meeting_room', 'equipment'].includes(type);
+
       const maxBookings = isExclusive ? 1 : resourceData.capacity;
 
       if ((existingBookings || 0) >= maxBookings) {
@@ -135,22 +142,22 @@ export function useBookings(userId?: string, resourceId?: string) {
 
       let newId = 'B-0001';
       if (lastBooking?.id) {
-        const lastNum = parseInt(lastBooking.id.split('-')[1]);
-        newId = `B-${String(lastNum + 1).padStart(4, '0')}`;
+        const lastNum = parseInt(String(lastBooking.id).split('-')[1], 10);
+        if (!Number.isNaN(lastNum)) {
+          newId = `B-${String(lastNum + 1).padStart(4, '0')}`;
+        }
       }
 
-      const { error: insertError } = await supabase
-        .from('bookings')
-        .insert([
-          {
-            id: newId,
-            resource_id: resourceId,
-            user_id: userId,
-            start_time: startTime.toISOString(),
-            end_time: endTime.toISOString(),
-            status: 'confirmed'
-          }
-        ]);
+      const { error: insertError } = await supabase.from('bookings').insert([
+        {
+          id: newId,
+          resource_id: resourceId,
+          user_id: userId,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          status: 'confirmed'
+        }
+      ]);
 
       if (insertError) throw insertError;
 

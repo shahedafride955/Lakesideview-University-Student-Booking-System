@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, DbResource, DbHistoricalUsage } from '@/lib/supabase';
 
-export type ResourceType = 'study-room' | 'computer-lab' | 'equipment' | 'meeting-room';
+export type ResourceType = 'study-room' | 'computer-lab' | 'conference-room';
 
 export interface Resource {
   id: string;
@@ -37,7 +37,7 @@ export function useResources() {
     const interval = setInterval(fetchResources, 60000);
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel).catch(() => {});
       clearInterval(interval);
     };
   }, []);
@@ -69,7 +69,7 @@ export function useResources() {
           let currentOccupancy = 0;
 
           const normalizedType = resource.type?.toLowerCase().trim() || '';
-          const exclusiveTypes = ['study-room', 'meeting-room', 'equipment', 'study room', 'meeting room', 'conference-room', 'conference room'];
+          const exclusiveTypes = ['study room', 'conference-room', 'conference room'];
 
           // If booked, mark as full for exclusive resources
           if (bookingsCount > 0 && exclusiveTypes.includes(normalizedType)) {
@@ -130,6 +130,8 @@ export function useResource(id: string) {
   useEffect(() => {
     fetchResource();
 
+    if (!id) return;
+
     // Subscribe to bookings changes for this resource
     const channel = supabase
       .channel(`resource-${id}`)
@@ -149,7 +151,7 @@ export function useResource(id: string) {
     const interval = setInterval(fetchResource, 60000);
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(channel).catch(() => {});
       clearInterval(interval);
     };
   }, [id]);
@@ -232,4 +234,103 @@ export function useResource(id: string) {
   }
 
   return { resource, loading, error, refetch: fetchResource };
+}
+
+export function useResourceSnapshot(snapshotTime: Date) {
+  const [snapshot, setSnapshot] = useState<Resource[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!snapshotTime || isNaN(snapshotTime.getTime())) {
+      setLoading(false);
+      setSnapshot([]);
+      return;
+    }
+    fetchSnapshotData();
+
+    // Subscribe to bookings changes to update snapshot in real-time
+    const channel = supabase
+      .channel('snapshot-bookings')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'bookings' },
+        () => fetchSnapshotData()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel).catch(() => {});
+    };
+  }, [snapshotTime?.getTime()]);
+
+  async function fetchSnapshotData() {
+    try {
+      setLoading(true);
+      
+      const { data: resourcesData, error: resourcesError } = await supabase
+        .from('resources')
+        .select('*')
+        .eq('is_active', true);
+
+      if (resourcesError) throw resourcesError;
+
+      const { data: activeBookings } = await supabase
+        .from('bookings')
+        .select('resource_id')
+        .eq('status', 'confirmed')
+        .lte('start_time', snapshotTime.toISOString())
+        .gt('end_time', snapshotTime.toISOString());
+
+      const resourcesWithOccupancy = (resourcesData || []).map((resource: DbResource) => {
+          const bookingsCount = activeBookings?.filter(b => b.resource_id === resource.id).length || 0;
+
+          let currentOccupancy = bookingsCount;
+          const normalizedType = resource.type?.toLowerCase().trim() || '';
+          const exclusiveTypes = ['study-room', 'meeting-room', 'equipment', 'study room', 'meeting room', 'conference-room', 'conference room'];
+
+          if (bookingsCount > 0 && exclusiveTypes.includes(normalizedType)) {
+            currentOccupancy = resource.capacity;
+          }
+
+          let features: string[] = [];
+          try {
+            const rawFeatures = resource.features as unknown;
+            if (Array.isArray(rawFeatures)) {
+              features = rawFeatures;
+            } else if (typeof rawFeatures === 'string') {
+              features = rawFeatures
+                .replace(/[{}]/g, '')
+                .split(',')
+                .map((f: string) => f.trim())
+                .filter((f: string) => f.length > 0);
+            }
+          } catch {
+            features = [];
+          }
+
+          return {
+            id: resource.id,
+            name: resource.name,
+            type: resource.type as ResourceType,
+            capacity: resource.capacity,
+            currentOccupancy,
+            building: resource.building,
+            floor: resource.floor,
+            features,
+            imageUrl: resource.image_url
+          };
+        });
+
+      setSnapshot(resourcesWithOccupancy);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching resource snapshot:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch snapshot');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return { snapshot, loading, error, refetch: fetchSnapshotData };
 }

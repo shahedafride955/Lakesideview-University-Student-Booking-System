@@ -155,10 +155,10 @@ export function ResourceDetail() {
           <div className="bg-white rounded-xl border border-gray-200 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Historical Usage Pattern</h3>
             <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={resourceHourlyData}>
+              <BarChart data={resourceHourlyData} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                <XAxis dataKey="hour" stroke="#6B7280" />
-                <YAxis stroke="#6B7280" />
+                <XAxis dataKey="hour" stroke="#6B7280" label={{ value: 'Time of Day', position: 'insideBottom', offset: -10 }} />
+                <YAxis stroke="#6B7280" label={{ value: 'Occupancy', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }} />
                 <Tooltip 
                   contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }}
                 />

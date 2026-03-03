@@ -178,10 +178,10 @@ export function Analytics() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Study Room Occupancy</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={charts.studyRooms} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <BarChart data={charts.studyRooms} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="name" stroke="#6B7280" />
-              <YAxis domain={[0, 100]} unit="%" stroke="#6B7280" />
+              <XAxis dataKey="name" stroke="#6B7280" label={{ value: 'Room Name', position: 'insideBottom', offset: -10 }} />
+              <YAxis domain={[0, 100]} unit="%" stroke="#6B7280" label={{ value: 'Utilization (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }} />
               <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }} formatter={tooltipFormatter} />
               <Bar dataKey="utilization" fill="#3B82F6" radius={[8, 8, 0, 0]} />
             </BarChart>
@@ -191,10 +191,10 @@ export function Analytics() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Conference Room Occupancy</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={charts.conferenceRooms} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <BarChart data={charts.conferenceRooms} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="name" stroke="#6B7280" />
-              <YAxis domain={[0, 100]} unit="%" stroke="#6B7280" />
+              <XAxis dataKey="name" stroke="#6B7280" label={{ value: 'Room Name', position: 'insideBottom', offset: -10 }} />
+              <YAxis domain={[0, 100]} unit="%" stroke="#6B7280" label={{ value: 'Utilization (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }} />
               <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }} formatter={tooltipFormatter} />
               <Bar dataKey="utilization" fill="#10B981" radius={[8, 8, 0, 0]} />
             </BarChart>
@@ -204,10 +204,10 @@ export function Analytics() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Computer Lab Occupancy</h3>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={charts.computerLabs} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+            <BarChart data={charts.computerLabs} margin={{ top: 5, right: 30, left: 20, bottom: 25 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-              <XAxis dataKey="name" stroke="#6B7280" />
-              <YAxis domain={[0, 100]} unit="%" stroke="#6B7280" />
+              <XAxis dataKey="name" stroke="#6B7280" label={{ value: 'Lab Name', position: 'insideBottom', offset: -10 }} />
+              <YAxis domain={[0, 100]} unit="%" stroke="#6B7280" label={{ value: 'Utilization (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' } }} />
               <Tooltip contentStyle={{ backgroundColor: '#fff', border: '1px solid #E5E7EB', borderRadius: '8px' }} formatter={tooltipFormatter} />
               <Bar dataKey="utilization" fill="#F59E0B" radius={[8, 8, 0, 0]} />
             </BarChart>

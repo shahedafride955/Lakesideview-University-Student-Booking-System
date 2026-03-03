@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router';
-import { BarChart3, Calendar, LayoutDashboard, Menu, X, LogOut, User } from 'lucide-react';
+import { BarChart3, Calendar, LayoutDashboard, Menu, X, LogOut, User, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
@@ -14,6 +14,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Analytics', path: '/analytics', icon: BarChart3 },
     { name: 'My Bookings', path: '/bookings', icon: Calendar },
+    { name: 'Bookings Pattern', path: '/peak-times', icon: TrendingUp },
   ];
 
   const isActive = (path: string) => {

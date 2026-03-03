@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { Search, Filter, TrendingUp, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import { ResourceCard } from '@/app/components/ResourceCard';
 import { useResources } from '@/hooks/useResources';
 
 export function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('');
+  const navigate = useNavigate();
   const { resources, loading, error } = useResources();
 
   const filteredResources = resources.filter((resource) => {
@@ -75,15 +77,20 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Peak Hours</p>
-              <p className="text-3xl font-bold text-purple-600">2-6 PM</p>
-              <p className="text-sm text-gray-500 mt-1">Expect higher occupancy</p>
-            </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-purple-600" />
+        <div
+          onClick={() => navigate('/peak-times')}
+          className="block bg-white rounded-xl border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer"
+        >
+          <div className="h-full">
+            <div className="flex items-center justify-between h-full">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Peak Booking Times</p>
+                <p className="text-3xl font-bold text-purple-600">View Report</p>
+                <p className="text-sm text-gray-500 mt-1">See hourly booking trends</p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-purple-600" />
+              </div>
             </div>
           </div>
         </div>

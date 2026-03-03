@@ -6,6 +6,7 @@ import { Analytics } from '@/app/pages/Analytics';
 import { ResourceDetail } from '@/app/pages/ResourceDetail';
 import { MyBookings } from '@/app/pages/MyBookings';
 import { Login } from '@/app/pages/Login';
+import { PeakBookingTimes } from '@/app/pages/PeakBookingTimes';
 
 function Root() {
   return (
@@ -47,6 +48,16 @@ function BookingsPage() {
   );
 }
 
+function PeakTimesPage() {
+  return (
+    <ProtectedRoute>
+      <Layout>
+        <PeakBookingTimes />
+      </Layout>
+    </ProtectedRoute>
+  );
+}
+
 function NotFound() {
   return (
     <Layout>
@@ -78,6 +89,10 @@ export const router = createBrowserRouter([
   {
     path: '/bookings',
     Component: BookingsPage,
+  },
+  {
+    path: '/peak-times',
+    Component: PeakTimesPage,
   },
   {
     path: '*',

@@ -12,7 +12,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   const navigation = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Analytics', path: '/analytics', icon: BarChart3 },
+    { name: 'Future Availibility', path: '/analytics', icon: BarChart3 },
     { name: 'My Bookings', path: '/bookings', icon: Calendar },
     { name: 'Bookings Pattern', path: '/peak-times', icon: TrendingUp },
   ];

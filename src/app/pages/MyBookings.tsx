@@ -139,7 +139,7 @@ export function MyBookings() {
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">This Month</p>
+              <p className="text-sm text-gray-600 mb-1">Overall</p>
               <p className="text-3xl font-bold text-purple-600">{bookings.length}</p>
             </div>
             <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">

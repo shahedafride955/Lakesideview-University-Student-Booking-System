@@ -24,71 +24,15 @@ export function PeakBookingTimes() {
   const [topResourcesData, setTopResourcesData] = useState<ResourceBookingData[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [totalRecords, setTotalRecords] = useState<number>(0);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        let allData: { recorded_at: string; occupancy_count: number }[] = [];
+        let allBookings: { start_time: string; resources: { name: string } | null }[] = [];
         let from = 0;
         const step = 1000;
         let fetchMore = true;
-
-        while (fetchMore) {
-          const { data, error } = await supabase
-            .from('historical_usage')
-            .select('recorded_at, occupancy_count')
-            .order('recorded_at', { ascending: true })
-            .range(from, from + step - 1);
-
-          if (error) throw error;
-
-          if (data && data.length > 0) {
-            allData = [...allData, ...data];
-            if (data.length < step) fetchMore = false;
-            else from += step;
-          } else {
-            fetchMore = false;
-          }
-        }
-
-        if (allData.length > 0) {
-          // Initialize hours from 0 AM to 12 AM (midnight)
-          const startHour = 0;
-          const endHour = 24;
-          const initHourlyData = () => Array.from({ length: endHour - startHour }, (_, i) => ({
-            hour: `${String(i + startHour).padStart(2, '0')}:00`,
-            occupancy: 0,
-          }));
-
-          const total = initHourlyData();
-          const uniqueDays = new Set<string>();
-
-          allData.forEach((record) => {
-            const date = new Date(record.recorded_at);
-            uniqueDays.add(date.toDateString());
-            const hour = date.getHours();
-
-            if (hour >= startHour && hour <= endHour) {
-              const index = hour - startHour;
-              if (total[index]) {
-                total[index].occupancy += record.occupancy_count;
-              }
-            }
-          });
-
-          // Process Hourly Data
-          const daysCount = uniqueDays.size || 1;
-          const averagedData = total.map(d => ({ ...d, occupancy: Math.round(d.occupancy / daysCount) }));
-          setPeakData(averagedData);
-          setTotalRecords(allData.length);
-        }
-
-        // Fetch Bookings Data for Daily Graph
-        let allBookings: { start_time: string; resources: { name: string } | null }[] = [];
-        from = 0;
-        fetchMore = true;
 
         while (fetchMore) {
           const { data, error } = await supabase
@@ -109,6 +53,15 @@ export function PeakBookingTimes() {
         }
 
         if (allBookings.length > 0) {
+          // Initialize hours from 0 AM to 12 AM (midnight)
+          const startHour = 0;
+          const endHour = 24;
+          const initHourlyData = () => Array.from({ length: endHour - startHour }, (_, i) => ({
+            hour: `${String(i + startHour).padStart(2, '0')}:00`,
+            occupancy: 0,
+          }));
+
+          const total = initHourlyData();
           const uniqueBookingDays = new Set<string>();
           const dailyBookingTotals = new Array(7).fill(0);
           const resourceCounts: Record<string, number> = {};
@@ -116,11 +69,26 @@ export function PeakBookingTimes() {
           allBookings.forEach((booking) => {
             const date = new Date(booking.start_time);
             uniqueBookingDays.add(date.toDateString());
+
+            // Hourly Data
+            const hour = date.getHours();
+            if (hour >= startHour && hour < endHour) {
+              const index = hour - startHour;
+              if (total[index]) {
+                total[index].occupancy += 1;
+              }
+            }
+
             dailyBookingTotals[date.getDay()]++;
 
             const resourceName = booking.resources?.name || 'Unknown Resource';
             resourceCounts[resourceName] = (resourceCounts[resourceName] || 0) + 1;
           });
+
+          // Process Hourly Data
+          const daysCount = uniqueBookingDays.size || 1;
+          const averagedData = total.map(d => ({ ...d, occupancy: Math.round(d.occupancy / daysCount) }));
+          setPeakData(averagedData);
 
           const dayCounts = new Array(7).fill(0);
           uniqueBookingDays.forEach(dateStr => {
@@ -181,7 +149,6 @@ export function PeakBookingTimes() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Peak Booking Insights</h1>
         <p className="text-gray-600">
           Analyze average occupancy across different times of the day.
-          {totalRecords > 0 && <span className="ml-2 text-sm bg-gray-100 px-2 py-1 rounded-full">Based on {totalRecords.toLocaleString()} records</span>}
         </p>
       </div>
 

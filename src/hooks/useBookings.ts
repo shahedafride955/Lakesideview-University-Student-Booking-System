@@ -144,7 +144,7 @@ export function useBookings(userId?: string, resourceId?: string) {
 
       // Create an array of new booking objects, one for each attendee
       const newBookings = Array.from({ length: attendees }, (_, i) => {
-        const newId = `B-${String(lastNum + 1 + i).padStart(4, '0')}`;
+        const newId = `BKG-${String(lastNum + 1 + i).padStart(4, '0')}`;
         return {
           id: newId,
           resource_id: resourceId,
